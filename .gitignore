@@ -1,0 +1,9 @@
+target/
+dist/
+.local/
+*.RAF
+*.raf
+*.CR2
+*.NEF
+*.DNG
+*.log
