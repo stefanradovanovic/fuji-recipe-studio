@@ -1,10 +1,20 @@
 # Fuji Recipe Studio
 
-A standalone Windows app for applying **approximate Fujifilm recipe looks** to X-T5 RAW photographs. Written in Rust, with an egui/wgpu interface and local image processing. No camera connection, Python installation, account, or photo upload.
+A standalone Windows app for applying **approximate Fujifilm recipe looks** to X-T5 RAW photographs. Written in Rust, with an egui/wgpu interface and local image processing. Photo editing needs no camera connection, Python installation, account, or photo upload.
+
+## Install and update
+
+Download `FujiRecipeStudio-Setup-0.2.0-x64.exe` from [Releases](https://github.com/stefanradovanovic/fuji-recipe-studio/releases/latest), run it, and launch **Fuji Recipe Studio** from the Start menu. The installer supports Windows 10/11 x64, installs for the current user without administrator rights, and adds an entry to Windows' installed apps for uninstalling. A desktop shortcut is optional.
+
+In the app, choose **Check for updates** in the top bar. If a newer stable release is available, choose **Download update**, then **Install and restart**. Save recipe edits and export any photo you want to keep before restarting: the current editing session is not restored. Your saved recipe library and original photographs are preserved by updates and uninstalling.
+
+The repository is private. Updates use an existing [GitHub CLI](https://cli.github.com/) sign-in with repository access; on a new PC, install GitHub CLI and run `gh auth login --hostname github.com` first. The app prefers the owner's existing sign-in, without changing the active CLI account. It does not store a token or bundle credentials. Manual installation from the private Releases page also works. Offline photo editing does not require GitHub CLI or an account.
+
+Update checks happen only when requested. Downloads stay on GitHub HTTPS hosts; the app checks the exact asset name, size, and GitHub's SHA-256 digest, then rechecks the file before launching Setup. These are integrity checks, not Authenticode signing: this release's Windows installer is unsigned.
 
 ## Use the app
 
-1. Open `FujiRecipeStudio.exe` on Windows 10/11 x64 with a DirectX 12 compatible graphics driver.
+1. Launch **Fuji Recipe Studio** (or open the portable `FujiRecipeStudio.exe`) on Windows 10/11 x64 with a DirectX 12 compatible graphics driver.
 2. Choose **Open photos**, or drag in a `.RAF`. Select opened photographs in the photo strip.
 3. Pick a recipe. **Compare** gives you a draggable divider between the neutral RAW and the recipe.
 4. Adjust exposure and settings. **Save as recipe** adds a personal preset.
@@ -55,6 +65,8 @@ cargo build --release --locked --bin FujiRecipeStudio
 ```
 
 `scripts/build.ps1` creates a portable folder under `dist`. For an isolated Rust/MinGW toolchain with `cargo`, `rustup`, and `mingw64` subfolders, pass `-ToolchainRoot <folder>`.
+
+To build the Windows installer, first build/package the app, then run `scripts/installer.ps1 -Compiler <path-to-ISCC.exe>` with Inno Setup 7. The result and its SHA-256 file are written to `dist/installer`. See [Publishing updates](docs/releases.md) for the repeatable release process.
 
 Real-file verification and benchmarks:
 

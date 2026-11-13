@@ -5,6 +5,7 @@ use fuji_recipe_studio::{
     engine::{self, Frame},
     import::{self, Imported},
     recipe::{self, Recipe},
+    updates,
 };
 use image::RgbImage;
 use std::{
@@ -28,6 +29,9 @@ enum Event {
     Rendered(u64, u64, anyhow::Result<RgbImage>, Duration),
     Exported(anyhow::Result<PathBuf>, Duration),
     Imported(anyhow::Result<Imported>),
+    UpdateChecked(anyhow::Result<updates::Check>),
+    UpdateProgress(u64, u64),
+    UpdateDownloaded(anyhow::Result<updates::Prepared>),
 }
 
 #[derive(Default)]
@@ -39,6 +43,17 @@ struct ImportDialog {
     busy: bool,
     preview: Option<Imported>,
     error: String,
+}
+
+#[derive(Default)]
+struct UpdateDialog {
+    open: bool,
+    busy: bool,
+    message: String,
+    error: String,
+    release: Option<updates::Release>,
+    prepared: Option<updates::Prepared>,
+    progress: Option<(u64, u64)>,
 }
 
 pub struct Studio {
@@ -75,6 +90,7 @@ pub struct Studio {
     save_open: bool,
     save_name: String,
     help_open: bool,
+    updates: UpdateDialog,
     capture_path: Option<PathBuf>,
     capture_requested: bool,
 }
@@ -164,6 +180,7 @@ impl Studio {
             save_open: false,
             save_name: String::new(),
             help_open: false,
+            updates: UpdateDialog::default(),
             capture_path: None,
             capture_requested: false,
         };
@@ -359,6 +376,42 @@ impl Studio {
                         Err(e) => self.import.error = format!("{e:#}"),
                     }
                 }
+                Event::UpdateChecked(result) => {
+                    self.updates.busy = false;
+                    match result {
+                        Ok(updates::Check::Current { latest }) => {
+                            self.updates.message =
+                                format!("You're up to date. Latest stable release: {latest}.");
+                        }
+                        Ok(updates::Check::Available(release)) => {
+                            self.updates.message =
+                                format!("Version {} is available.", release.version);
+                            self.updates.release = Some(release);
+                        }
+                        Err(error) => {
+                            self.updates.message.clear();
+                            self.updates.error = error.to_string();
+                        }
+                    }
+                }
+                Event::UpdateProgress(done, total) => self.updates.progress = Some((done, total)),
+                Event::UpdateDownloaded(result) => {
+                    self.updates.busy = false;
+                    match result {
+                        Ok(prepared) => {
+                            self.updates.message = format!(
+                                "Version {} is downloaded and verified.",
+                                prepared.version()
+                            );
+                            self.updates.prepared = Some(prepared);
+                        }
+                        Err(error) => {
+                            self.updates.progress = None;
+                            self.updates.message.clear();
+                            self.updates.error = error.to_string();
+                        }
+                    }
+                }
             }
         }
         if !self.loading {
@@ -408,6 +461,7 @@ impl Studio {
             || self.render_due.is_some()
             || self.exporting
             || self.import.busy
+            || self.updates.busy
         {
             ctx.request_repaint_after(Duration::from_millis(35));
         }
@@ -438,7 +492,10 @@ impl Studio {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if ui.add_enabled(self.full.is_some() && !self.exporting, egui::Button::new(RichText::new(if self.exporting { "Exporting…" } else { "Export image" }).color(BG).strong()).fill(ACCENT)).clicked() { self.export(ctx); }
                     if ui.button("?").clicked() { self.help_open = true; }
-                    ui.label(RichText::new("APPROXIMATE FILM LOOKS").size(10.).color(ACCENT)).on_hover_text("Independent rendering. No camera connection. Results will differ from Fujifilm JPEGs.");
+                    if ui.button("Check for updates").clicked() { self.check_updates(ctx); }
+                    if ui.available_width() > 185. {
+                        ui.label(RichText::new("APPROXIMATE FILM LOOKS").size(10.).color(ACCENT)).on_hover_text("Independent rendering. No camera connection. Results will differ from Fujifilm JPEGs.");
+                    }
                 });
             });
         });
@@ -782,6 +839,7 @@ impl Studio {
     }
 
     fn dialogs(&mut self, ctx: &egui::Context) {
+        self.update_dialog(ctx);
         if self.import.open {
             let mut open = true;
             let mut fetch = false;
@@ -865,16 +923,115 @@ impl Studio {
         }
         if self.help_open {
             egui::Window::new("About your darkroom").open(&mut self.help_open).default_width(460.).show(ctx, |ui| {
-                ui.label(RichText::new("Fuji Recipe Studio 0.1").size(21.).strong());
+                ui.label(RichText::new(concat!("Fuji Recipe Studio ", env!("CARGO_PKG_VERSION"))).size(21.).strong());
                 ui.label("Open a RAW, choose a recipe, adjust exposure and export. Drag the divider in Compare to reveal the neutral RAW.");
                 ui.separator();
                 ui.label("The film looks are independent approximations. They do not use Fujifilm's proprietary rendering. Auto WB uses the white balance recorded in your photo. DR settings shape the tone curve; they cannot recover clipped highlights or change the original capture ISO.");
                 ui.label("RAW input: Fujifilm X-Trans RAF, including X-T5. JPEG/PNG/TIFF inputs are treated as sRGB. Export: full-resolution JPEG or PNG, with a recipe JSON sidecar. Exports do not copy EXIF/GPS metadata.");
-                ui.label("No camera connection, account or photo upload. Network access is used only when you request a recipe URL.");
+                ui.label("No camera connection or photo upload. Photo editing is offline. Network access is used when you request a recipe URL or check for updates.");
                 ui.label(format!("Your saved recipes: {}", self.library_path.display()));
                 ui.label("Ctrl+O · Open photos     Ctrl+E · Export     Ctrl+I · Import recipe");
                 ui.hyperlink_to("Recipe sources & project", "https://github.com/stefanradovanovic/fuji-recipe-studio");
             });
+        }
+    }
+
+    fn check_updates(&mut self, ctx: &egui::Context) {
+        self.updates.open = true;
+        if self.updates.busy {
+            return;
+        }
+        self.updates = UpdateDialog {
+            open: true,
+            busy: true,
+            message: "Checking GitHub Releases…".into(),
+            ..Default::default()
+        };
+        let tx = self.tx.clone();
+        let ctx = ctx.clone();
+        std::thread::spawn(move || {
+            let result = guarded(|| updates::check(env!("CARGO_PKG_VERSION")));
+            let _ = tx.send(Event::UpdateChecked(result));
+            ctx.request_repaint();
+        });
+    }
+
+    fn download_update(&mut self, ctx: &egui::Context) {
+        let Some(release) = self.updates.release.clone() else {
+            return;
+        };
+        if self.updates.busy {
+            return;
+        }
+        self.updates.busy = true;
+        self.updates.error.clear();
+        self.updates.message = "Downloading the Windows installer…".into();
+        let tx = self.tx.clone();
+        let ctx = ctx.clone();
+        std::thread::spawn(move || {
+            let result = guarded(|| {
+                updates::download(&release, |done, total| {
+                    let _ = tx.send(Event::UpdateProgress(done, total));
+                })
+            });
+            let _ = tx.send(Event::UpdateDownloaded(result));
+            ctx.request_repaint();
+        });
+    }
+
+    fn update_dialog(&mut self, ctx: &egui::Context) {
+        if !self.updates.open {
+            return;
+        }
+        let mut open = true;
+        let mut check = false;
+        let mut download = false;
+        let mut install = false;
+        let can_install =
+            !self.loading && !self.exporting && self.render_running.is_none() && !self.import.busy;
+        egui::Window::new("Software updates").open(&mut open).default_width(520.).collapsible(false).show(ctx, |ui| {
+            ui.label(RichText::new(concat!("Installed version ", env!("CARGO_PKG_VERSION"))).size(19.).strong());
+            ui.add_space(8.);
+            if self.updates.busy { ui.spinner(); }
+            if !self.updates.message.is_empty() { ui.label(&self.updates.message); }
+            if !self.updates.error.is_empty() { ui.colored_label(Color32::from_rgb(245, 163, 132), &self.updates.error); }
+            if let Some((done, total)) = self.updates.progress {
+                ui.add(egui::ProgressBar::new(done as f32 / total.max(1) as f32).text(format!("{:.1} / {:.1} MB", done as f32 / 1_048_576., total as f32 / 1_048_576.)));
+            }
+            if let Some(release) = &self.updates.release {
+                ui.hyperlink_to("View release notes on GitHub ↗", release.page_url());
+                if !release.notes.is_empty() {
+                    ui.collapsing("Release notes", |ui| { egui::ScrollArea::vertical().max_height(180.).show(ui, |ui| { ui.label(&release.notes); }); });
+                }
+                if self.updates.prepared.is_none() {
+                    download = ui.add_enabled(!self.updates.busy, egui::Button::new(format!("Download update · {:.1} MB", release.size_mb()))).clicked();
+                }
+            }
+            if self.updates.prepared.is_some() {
+                ui.separator();
+                ui.label("Save recipe edits and export any photo you need first. Installing closes this session and reopens the updated app. Saved recipes and original photos are kept.");
+                if !can_install { ui.label("Wait for current photo processing to finish before installing."); }
+                install = ui.add_enabled(can_install, egui::Button::new(RichText::new("Install and restart").color(BG).strong()).fill(ACCENT)).clicked();
+            }
+            ui.separator();
+            check = ui.add_enabled(!self.updates.busy, egui::Button::new("Check again")).clicked();
+            ui.label(RichText::new("Updates use this PC's GitHub CLI sign-in to access the private repository. Your photos are never uploaded.").small().color(MUTED));
+            ui.hyperlink_to("Open releases page ↗", updates::RELEASES_PAGE);
+        });
+        self.updates.open = open;
+        if check {
+            self.check_updates(ctx);
+        }
+        if download {
+            self.download_update(ctx);
+        }
+        if install {
+            if let Some(prepared) = &mut self.updates.prepared {
+                match prepared.install() {
+                    Ok(()) => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
+                    Err(error) => self.updates.error = error.to_string(),
+                }
+            }
         }
     }
 }

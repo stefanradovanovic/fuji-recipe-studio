@@ -52,7 +52,7 @@ try {
     }
     [IO.File]::WriteAllLines((Join-Path $licenseRoot 'DEPENDENCIES.md'), $inventory, [Text.UTF8Encoding]::new($false))
     Copy-Item -LiteralPath (Join-Path $projectRoot 'notices') -Destination $licenseRoot -Recurse -Force
-    $sourceFiles = @('Cargo.toml', 'Cargo.lock', '.gitignore', 'README.md', 'LICENSE', 'THIRD_PARTY.md', 'src', 'scripts', 'examples', 'notices')
+    $sourceFiles = @('Cargo.toml', 'Cargo.lock', '.gitignore', 'README.md', 'LICENSE', 'THIRD_PARTY.md', 'src', 'scripts', 'examples', 'notices', 'installer')
     if (Test-Path -LiteralPath 'docs') { $sourceFiles += 'docs' }
     Compress-Archive -LiteralPath $sourceFiles -DestinationPath (Join-Path $sourceRoot 'fuji-recipe-studio-source.zip') -Force
     Write-Output "Portable app and rebuildable source: $Destination"

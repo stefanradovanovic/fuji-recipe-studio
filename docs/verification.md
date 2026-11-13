@@ -1,8 +1,20 @@
-# Version 0.1 verification
+# Verification
+
+## Version 0.2: installer and updates
+
+Verified on Windows x64 on 14 November 2026.
+
+- All 16 release-profile library tests pass. The five updater tests cover semantic version ordering/no downgrade, invalid release metadata, download truncation/tampering, allowed HTTPS redirects, and checking the downloaded file again before execution.
+- The PowerShell packaging/publishing scripts parse successfully. The installer is compiled with the portable Inno Setup 7.1 compiler; its compiler signature was verified before use.
+- Installed 0.1.0 into an isolated folder, then upgraded it to 0.2.0 with the same silent/restart flags used by the updater. The installer retained the chosen directory and relaunched the app. The installed executable's SHA-256 matched the release build.
+- Observed the native **Check for updates** dialog with installed version 0.2.0 and its recoverable missing-release message before publishing.
+- Uninstalled the isolated installation successfully. The uninstall entry and installed executable were removed; the test recipe library, actual user profile, and original RAF remained unchanged.
+
+## Version 0.1: image processing
 
 Verified on Windows x64 with an Intel Core Ultra 7 255H, 32 GB RAM, Rust 1.100.0 GNU and a MinGW-w64 linker. Tests were run on 13–14 November 2026.
 
-## Automated checks
+### Automated checks
 
 - All 11 library tests passed in the release profile. Coverage includes recipe validation/import, library persistence, daylight camera calibration, neutral and monochrome rendering, image orientation, preview dimensions, blur edges and refusing to overwrite source/output files.
 - `cargo fmt --all --check` and `git diff --check` passed.
@@ -13,7 +25,7 @@ Verified on Windows x64 with an Intel Core Ultra 7 255H, 32 GB RAM, Rust 1.100.0
 
 Sample inputs: public raw.pixls.us X-T5 DSCF0021.RAF (lossless) and DSCF0022.RAF (compressed). Samples and derived photographs are excluded from the repository and portable package.
 
-## Native interface checks
+### Native interface checks
 
 - Opened a real RAF in the Windows app and inspected the neutral/recipe comparison.
 - Selected Classic B&W and observed the monochrome preview.
@@ -22,7 +34,7 @@ Sample inputs: public raw.pixls.us X-T5 DSCF0021.RAF (lossless) and DSCF0022.RAF
 - Verified that the saved library contained the expected recipe settings.
 - Confirmed the final build's Ctrl+I shortcut opens recipe import, and captured the rendered interface successfully with exit code 0.
 
-## Sample timing
+### Sample timing
 
 12 Rayon threads; 1,546 × 1,031 preview; median of five render calls after warming the lookup table. Disk cache was not deliberately cleared. UI presentation is excluded.
 
