@@ -1,7 +1,9 @@
 param(
     [Parameter(Mandatory = $true)][string]$NotesFile,
     [string]$Compiler = 'ISCC.exe',
-    [string]$ToolchainRoot = ''
+    [string]$ToolchainRoot = '',
+    [string]$SigningThumbprint = '',
+    [string]$SignTool = 'signtool.exe'
 )
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
@@ -21,7 +23,7 @@ try {
     $remoteCommit = gh api "repos/$repository/commits/main" --jq .sha
     if ($LASTEXITCODE -ne 0 -or $remoteCommit -ne $commit) { throw 'Push this commit to main before publishing.' }
     & (Join-Path $PSScriptRoot 'build.ps1') -ToolchainRoot $ToolchainRoot
-    & (Join-Path $PSScriptRoot 'installer.ps1') -Compiler $Compiler
+    & (Join-Path $PSScriptRoot 'installer.ps1') -Compiler $Compiler -SigningThumbprint $SigningThumbprint -SignTool $SignTool
     $installer = Join-Path $projectRoot "dist\installer\FujiRecipeStudio-Setup-$version-x64.exe"
     $digest = 'sha256:' + (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
     gh release create "v$version" $installer "$installer.sha256" --repo $repository --target $commit --draft --title "Fuji Recipe Studio $version" --notes-file $NotesFile

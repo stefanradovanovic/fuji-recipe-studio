@@ -4,13 +4,13 @@ A standalone Windows app for applying **approximate Fujifilm recipe looks** to X
 
 ## Install and update
 
-Download `FujiRecipeStudio-Setup-0.2.0-x64.exe` from [Releases](https://github.com/stefanradovanovic/fuji-recipe-studio/releases/latest), run it, and launch **Fuji Recipe Studio** from the Start menu. The installer supports Windows 10/11 x64, installs for the current user without administrator rights, and adds an entry to Windows' installed apps for uninstalling. A desktop shortcut is optional.
+Download the Windows x64 installer from [Releases](https://github.com/stefanradovanovic/fuji-recipe-studio/releases/latest), run it, and launch **Fuji Recipe Studio** from the Start menu. The installer supports Windows 10/11 x64, installs for the current user without administrator rights, and adds an entry to Windows' installed apps for uninstalling. A desktop shortcut is optional.
 
 In the app, choose **Check for updates** in the top bar. If a newer stable release is available, choose **Download update**, then **Install and restart**. Save recipe edits and export any photo you want to keep before restarting: the current editing session is not restored. Your saved recipe library and original photographs are preserved by updates and uninstalling.
 
 Updates are available from public GitHub Releases. No GitHub account, token, or GitHub CLI installation is needed to check or download updates. Manual installation from the Releases page also works. Photo editing works offline.
 
-Update checks happen only when requested. Downloads stay on GitHub HTTPS hosts; the app checks the exact asset name, size, and GitHub's SHA-256 digest, then rechecks the file before launching Setup. These are integrity checks, not Authenticode signing: this release's Windows installer is unsigned.
+Update checks happen only when requested. Downloads stay on GitHub HTTPS hosts. The app checks the exact asset name, size, and GitHub's SHA-256 digest, then rechecks the file before launching Setup. Version 0.2.1 ships unsigned, so Windows may show a SmartScreen warning.
 
 ## Use the app
 

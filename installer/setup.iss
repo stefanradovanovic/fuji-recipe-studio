@@ -1,5 +1,5 @@
 #ifndef AppVersion
-  #define AppVersion "0.2.0"
+  #define AppVersion "0.2.1"
 #endif
 #ifndef PackageDir
   #define PackageDir "..\dist\FujiRecipeStudio"
@@ -17,6 +17,11 @@ AppPublisherURL=https://github.com/stefanradovanovic/fuji-recipe-studio
 AppSupportURL=https://github.com/stefanradovanovic/fuji-recipe-studio/issues
 AppUpdatesURL=https://github.com/stefanradovanovic/fuji-recipe-studio/releases/latest
 VersionInfoVersion={#AppVersion}.0
+SetupIconFile=..\assets\studio.ico
+#ifdef PublisherSigning
+SignTool=FujiRecipeStudioPublisher
+SignedUninstaller=yes
+#endif
 DefaultDirName={localappdata}\Programs\Fuji Recipe Studio
 DefaultGroupName=Fuji Recipe Studio
 DisableProgramGroupPage=yes
@@ -40,7 +45,12 @@ SetupLogging=yes
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Shortcuts:"; Flags: unchecked
 
 [Files]
+#ifdef PublisherSigning
+Source: "{#PackageDir}\FujiRecipeStudio.exe"; DestDir: "{app}"; Flags: ignoreversion sign
+Source: "{#PackageDir}\*"; Excludes: "\FujiRecipeStudio.exe"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+#else
 Source: "{#PackageDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+#endif
 
 [Icons]
 Name: "{group}\Fuji Recipe Studio"; Filename: "{app}\FujiRecipeStudio.exe"; WorkingDir: "{app}"
