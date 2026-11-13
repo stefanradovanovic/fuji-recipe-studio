@@ -1172,7 +1172,6 @@ dependencies = [
  "ureq",
  "url",
  "wgpu",
- "zeroize",
 ]
 
 [[package]]

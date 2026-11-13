@@ -23,7 +23,6 @@ sha2 = "0.10"
 tempfile = "3"
 ureq = "2.12"
 url = "2"
-zeroize = "1"
 
 [profile.release]
 opt-level = 3

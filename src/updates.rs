@@ -1,5 +1,5 @@
 //! Explicit, user-initiated updates from this project's GitHub Releases.
-//! Credentials stay in memory and are sent only to api.github.com.
+//! Public release downloads need no account, GitHub CLI, or credentials.
 use anyhow::{Context, Result, bail, ensure};
 use semver::Version;
 use serde::Deserialize;
@@ -8,13 +8,10 @@ use std::{
     fs::File,
     io::{Read, Write},
     path::{Path, PathBuf},
-    process::{Command, Stdio},
+    process::Command,
     time::{Duration, Instant},
 };
 use url::Url;
-use zeroize::Zeroizing;
-
-pub const OWNER: &str = "stefanradovanovic";
 pub const REPOSITORY: &str = "stefanradovanovic/fuji-recipe-studio";
 pub const RELEASES_PAGE: &str =
     "https://github.com/stefanradovanovic/fuji-recipe-studio/releases/latest";
@@ -68,16 +65,9 @@ struct GithubAsset {
 }
 
 pub fn check(current: &str) -> Result<Check> {
-    let token = github_token();
     let agent = agent(Duration::from_secs(25));
     let url = format!("https://api.github.com/repos/{REPOSITORY}/releases/latest");
-    let response = request(
-        &agent,
-        &Url::parse(&url)?,
-        token.as_deref().map(|s| s.as_str()),
-        false,
-    )
-    .map_err(api_error)?;
+    let response = request(&agent, &Url::parse(&url)?, false).map_err(api_error)?;
     let mut bytes = Vec::new();
     response
         .into_reader()
@@ -180,7 +170,6 @@ fn trusted_download_url(url: &Url) -> bool {
 fn request(
     agent: &ureq::Agent,
     url: &Url,
-    token: Option<&str>,
     binary: bool,
 ) -> std::result::Result<ureq::Response, ureq::Error> {
     let mut request = agent
@@ -199,17 +188,17 @@ fn request(
         );
     if url.host_str() == Some("api.github.com") {
         request = request.set("X-GitHub-Api-Version", "2022-11-28");
-        if let Some(token) = token {
-            request = request.set("Authorization", &format!("Bearer {token}"));
-        }
     }
     request.call()
 }
 
 fn api_error(error: ureq::Error) -> anyhow::Error {
     match error {
-        ureq::Error::Status(401 | 403 | 404, _) => anyhow::anyhow!(
-            "GitHub releases are unavailable. This repository is private: use GitHub CLI to sign in as stefanradovanovic (or an account with access), then retry. A release must also be published."
+        ureq::Error::Status(403 | 429, _) => anyhow::anyhow!(
+            "GitHub is limiting update requests. Try again later, or use the Releases page."
+        ),
+        ureq::Error::Status(404, _) => anyhow::anyhow!(
+            "No public release is available yet. Please try again later, or use the Releases page."
         ),
         ureq::Error::Status(code, _) => {
             anyhow::anyhow!("GitHub returned HTTP {code}. Please retry later.")
@@ -273,7 +262,6 @@ pub fn download(release: &Release, progress: impl Fn(u64, u64)) -> Result<Prepar
         .prefix("download-")
         .tempdir_in(&base)?;
     let path = directory.path().join(&release.filename);
-    let token = github_token();
     let agent = agent(Duration::from_secs(180));
     let mut url = Url::parse(&format!(
         "https://api.github.com/repos/{REPOSITORY}/releases/assets/{}",
@@ -284,8 +272,7 @@ pub fn download(release: &Release, progress: impl Fn(u64, u64)) -> Result<Prepar
             trusted_download_url(&url),
             "The update download redirected outside GitHub. Download cancelled."
         );
-        let response =
-            request(&agent, &url, token.as_deref().map(|s| s.as_str()), true).map_err(api_error)?;
+        let response = request(&agent, &url, true).map_err(api_error)?;
         if (300..400).contains(&response.status()) {
             url = url.join(
                 response
@@ -362,79 +349,6 @@ fn verify_file(path: &Path, release: &Release) -> Result<()> {
         "The downloaded installer has changed. Download it again."
     );
     copy_verified(File::open(path)?, &mut std::io::sink(), release, |_, _| {})
-}
-
-fn github_token() -> Option<Zeroizing<String>> {
-    let gh = find_gh()?;
-    // Prefer the repository owner's existing sign-in; do not change the active
-    // account, persist a token, or inherit a developer's GH_TOKEN override.
-    read_gh_token(
-        &gh,
-        &["auth", "token", "--hostname", "github.com", "--user", OWNER],
-    )
-    .or_else(|| read_gh_token(&gh, &["auth", "token", "--hostname", "github.com"]))
-}
-
-fn find_gh() -> Option<PathBuf> {
-    let mut candidates = Vec::new();
-    if let Some(program_files) = std::env::var_os("ProgramFiles") {
-        candidates.push(
-            PathBuf::from(program_files)
-                .join("GitHub CLI")
-                .join("gh.exe"),
-        );
-    }
-    if let Some(paths) = std::env::var_os("PATH") {
-        candidates.extend(
-            std::env::split_paths(&paths)
-                .filter(|p| p.is_absolute())
-                .map(|p| p.join(if cfg!(windows) { "gh.exe" } else { "gh" })),
-        );
-    }
-    candidates.into_iter().find(|p| p.is_file())
-}
-
-fn read_gh_token(gh: &Path, args: &[&str]) -> Option<Zeroizing<String>> {
-    let mut command = Command::new(gh);
-    command
-        .args(args)
-        .env_remove("GH_TOKEN")
-        .env_remove("GITHUB_TOKEN")
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null());
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        command.creation_flags(0x08000000); // CREATE_NO_WINDOW
-    }
-    let mut child = command.spawn().ok()?;
-    let started = Instant::now();
-    loop {
-        if let Some(status) = child.try_wait().ok()? {
-            if !status.success() {
-                return None;
-            }
-            let mut bytes = Zeroizing::new(Vec::new());
-            child
-                .stdout
-                .take()?
-                .take(8193)
-                .read_to_end(&mut bytes)
-                .ok()?;
-            let token = std::str::from_utf8(&bytes).ok()?.trim();
-            if !(10..=8192).contains(&token.len()) || token.chars().any(char::is_whitespace) {
-                return None;
-            }
-            return Some(Zeroizing::new(token.to_owned()));
-        }
-        if started.elapsed() > Duration::from_secs(10) {
-            let _ = child.kill();
-            let _ = child.wait();
-            return None;
-        }
-        std::thread::sleep(Duration::from_millis(25));
-    }
 }
 
 #[cfg(test)]

@@ -1015,7 +1015,7 @@ impl Studio {
             }
             ui.separator();
             check = ui.add_enabled(!self.updates.busy, egui::Button::new("Check again")).clicked();
-            ui.label(RichText::new("Updates use this PC's GitHub CLI sign-in to access the private repository. Your photos are never uploaded.").small().color(MUTED));
+            ui.label(RichText::new("Updates come from GitHub. No account is needed and your photos are never uploaded.").small().color(MUTED));
             ui.hyperlink_to("Open releases page ↗", updates::RELEASES_PAGE);
         });
         self.updates.open = open;

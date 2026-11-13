@@ -1,6 +1,6 @@
 # Publishing Windows updates
 
-Updates are stable GitHub Releases in the private `stefanradovanovic/fuji-recipe-studio` repository. The application version comes from `Cargo.toml`; semantic version comparison prevents an older release from being offered as an update. The first installable release is 0.2.0. The older 0.1.0 portable app must be updated manually once because it has no update button.
+Updates are stable GitHub Releases in the public `stefanradovanovic/fuji-recipe-studio` repository. The application version comes from `Cargo.toml`; semantic version comparison prevents an older release from being offered as an update. The first installable release is 0.2.0. The older 0.1.0 portable app must be updated manually once because it has no update button.
 
 ## Prepare a release
 
@@ -32,6 +32,6 @@ For an upgrade test, use a disposable Windows user profile or an isolated instal
 
 - Checks, downloads, and progress reporting run in background workers. Checking for updates does not interrupt photo editing.
 - Installation is user initiated and waits for active photo processing. It closes the editing session, performs a per-user upgrade, and relaunches the app. It does not reboot Windows or force-close other apps.
-- Private-release access uses GitHub CLI credentials in memory. Authorization is sent only to `api.github.com`, never to redirected asset hosts. Tokens are not saved in app settings or logs.
+- The app uses the public GitHub API without authentication. It does not inspect credentials, invoke GitHub CLI, or need an account. GitHub's unauthenticated rate limit can temporarily require waiting between checks; manual downloads remain available on the Releases page.
 - Downloads are bounded to 256 MiB, require an exact filename, use a restricted list of GitHub HTTPS hosts, and are checked for size and SHA-256 integrity before execution. Failed or unused downloads are discarded. A launched installer stays in the app's local update cache because Windows may still need its executable.
-- Download integrity does not establish an independent publisher signature. The current installer has no Authenticode certificate. To distribute publicly in future, arrange code signing and deliberately change repository/distribution access; do not embed an access token in the app.
+- Download integrity does not establish an independent publisher signature. The current installer has no Authenticode certificate. A future release can add Windows publisher signing before hashing and uploading the installer.

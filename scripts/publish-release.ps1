@@ -26,9 +26,13 @@ try {
     $digest = 'sha256:' + (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
     gh release create "v$version" $installer "$installer.sha256" --repo $repository --target $commit --draft --title "Fuji Recipe Studio $version" --notes-file $NotesFile
     if ($LASTEXITCODE -ne 0) { throw 'Could not create the draft release. Check existing releases before retrying.' }
-    $releaseText = gh api "repos/$repository/releases/tags/v$version"
+    # Draft tags are not necessarily addressable through /releases/tags yet.
+    $releaseText = gh api "repos/$repository/releases?per_page=100"
     if ($LASTEXITCODE -ne 0) { throw 'Could not verify the draft release. It has not been published.' }
-    $release = $releaseText | ConvertFrom-Json
+    $releaseList = $releaseText | ConvertFrom-Json
+    $matches = @($releaseList | Where-Object { $_.tag_name -eq "v$version" -and $_.draft })
+    if ($matches.Count -ne 1 -or $matches[0].target_commitish -ne $commit) { throw 'Could not identify the new release draft. It has not been published.' }
+    $release = $matches[0]
     $asset = @($release.assets | Where-Object name -eq ([IO.Path]::GetFileName($installer)))
     if ($asset.Count -ne 1 -or $asset[0].digest -ne $digest) { throw 'Uploaded installer digest mismatch. The release remains a draft.' }
     gh release edit "v$version" --repo $repository --draft=false --latest

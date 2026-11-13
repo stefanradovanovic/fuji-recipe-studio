@@ -6,6 +6,7 @@ Verified on Windows x64 on 14 November 2026.
 
 - All 16 release-profile library tests pass. The five updater tests cover semantic version ordering/no downgrade, invalid release metadata, download truncation/tampering, allowed HTTPS redirects, and checking the downloaded file again before execution.
 - The PowerShell packaging/publishing scripts parse successfully. The installer is compiled with the portable Inno Setup 7.1 compiler; its compiler signature was verified before use.
+- Before making the repository public, inspected its tracked file list and scanned all 40 historical blobs across three commits for credential patterns, private keys, local user directories, and photograph/sensitive-file extensions. No matches were found. An unauthenticated GitHub API request confirmed public access.
 - Installed 0.1.0 into an isolated folder, then upgraded it to 0.2.0 with the same silent/restart flags used by the updater. The installer retained the chosen directory and relaunched the app. The installed executable's SHA-256 matched the release build.
 - Observed the native **Check for updates** dialog with installed version 0.2.0 and its recoverable missing-release message before publishing.
 - Uninstalled the isolated installation successfully. The uninstall entry and installed executable were removed; the test recipe library, actual user profile, and original RAF remained unchanged.

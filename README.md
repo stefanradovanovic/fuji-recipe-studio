@@ -8,7 +8,7 @@ Download `FujiRecipeStudio-Setup-0.2.0-x64.exe` from [Releases](https://github.c
 
 In the app, choose **Check for updates** in the top bar. If a newer stable release is available, choose **Download update**, then **Install and restart**. Save recipe edits and export any photo you want to keep before restarting: the current editing session is not restored. Your saved recipe library and original photographs are preserved by updates and uninstalling.
 
-The repository is private. Updates use an existing [GitHub CLI](https://cli.github.com/) sign-in with repository access; on a new PC, install GitHub CLI and run `gh auth login --hostname github.com` first. The app prefers the owner's existing sign-in, without changing the active CLI account. It does not store a token or bundle credentials. Manual installation from the private Releases page also works. Offline photo editing does not require GitHub CLI or an account.
+Updates are available from public GitHub Releases. No GitHub account, token, or GitHub CLI installation is needed to check or download updates. Manual installation from the Releases page also works. Photo editing works offline.
 
 Update checks happen only when requested. Downloads stay on GitHub HTTPS hosts; the app checks the exact asset name, size, and GitHub's SHA-256 digest, then rechecks the file before launching Setup. These are integrity checks, not Authenticode signing: this release's Windows installer is unsigned.
 
