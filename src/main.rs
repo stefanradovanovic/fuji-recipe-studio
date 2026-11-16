@@ -13,7 +13,6 @@ fn main() {
         .num_threads(threads)
         .build_global();
     let mut viewport = eframe::egui::ViewportBuilder::default()
-        .with_inner_size([1200.0, 800.0])
         .with_maximized(true)
         .with_min_inner_size([1000.0, 680.0]);
     if let Ok(icon) = eframe::icon_data::from_png_bytes(include_bytes!("../assets/studio.png")) {
